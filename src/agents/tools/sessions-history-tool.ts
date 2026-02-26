@@ -62,17 +62,12 @@ function sanitizeHistoryContentBlock(block: unknown): {
     redacted ||= res.redacted;
   }
   if (type === "thinking") {
-    if (typeof entry.thinking === "string") {
-      const res = truncateHistoryText(entry.thinking);
-      entry.thinking = res.text;
-      truncated ||= res.truncated;
-      redacted ||= res.redacted;
-    }
-    // The encrypted signature can be extremely large and is not useful for history recall.
-    if ("thinkingSignature" in entry) {
-      delete entry.thinkingSignature;
-      truncated = true;
-    }
+    // Strip the entire thinking block to avoid Anthropic API rejection.
+    // The API requires thinking blocks in the latest assistant message to be
+    // byte-identical to the original response. Deleting just thinkingSignature
+    // constitutes a modification and causes rejection.
+    // Since thinking content is not useful after compaction, we strip the whole block.
+    return { block: null, truncated: true, redacted: false };
   }
   if (typeof entry.partialJson === "string") {
     const res = truncateHistoryText(entry.partialJson);
