@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { runCliAgent } from "../../agents/cli-runner.js";
 import { getCliSessionId } from "../../agents/cli-session.js";
+import { isFailoverError } from "../../agents/failover-error.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
 import {
@@ -466,6 +467,13 @@ export async function runAgentTurnWithFallback(params: {
       const isSessionCorruption = /function call turn comes immediately after/i.test(message);
       const isRoleOrderingError = /incorrect role information|roles must alternate/i.test(message);
       const isTransientHttp = isTransientHttpError(message);
+      const isFailover = isFailoverError(err);
+
+      if (isFailover) {
+        // FailoverError includes rate limit errors and auth failures.
+        // Log it for debugging purposes.
+        defaultRuntime.error(`Agent run failed with failover error: ${message}`);
+      }
 
       if (
         isCompactionFailure &&
