@@ -44,6 +44,22 @@ const asFiniteNumber = (value: unknown): number | undefined => {
   return value;
 };
 
+// Pick the first value that is > 0, otherwise return the first defined value.
+// This handles providers that return both input_tokens (0) and prompt_tokens (actual count).
+const asFiniteNumberWithPreferred = (value: unknown, fallback: unknown): number | undefined => {
+  const primary = asFiniteNumber(value);
+  const secondary = asFiniteNumber(fallback);
+  // Prefer non-zero values, otherwise fall back to any defined value
+  if (primary !== undefined && primary > 0) {
+    return primary;
+  }
+  if (secondary !== undefined && secondary > 0) {
+    return secondary;
+  }
+  // Return primary if defined (even if 0), otherwise secondary
+  return primary ?? secondary;
+};
+
 export function hasNonzeroUsage(usage?: NormalizedUsage | null): usage is NormalizedUsage {
   if (!usage) {
     return false;
@@ -58,15 +74,15 @@ export function normalizeUsage(raw?: UsageLike | null): NormalizedUsage | undefi
     return undefined;
   }
 
-  const input = asFiniteNumber(
-    raw.input ?? raw.inputTokens ?? raw.input_tokens ?? raw.promptTokens ?? raw.prompt_tokens,
+  // Prefer input_tokens but fall back to prompt_tokens if input_tokens is 0 or undefined.
+  // Some providers (e.g., yunwu-openai) return input_tokens=0 but prompt_tokens with actual count.
+  const input = asFiniteNumberWithPreferred(
+    raw.input ?? raw.inputTokens ?? raw.input_tokens,
+    raw.promptTokens ?? raw.prompt_tokens,
   );
-  const output = asFiniteNumber(
-    raw.output ??
-      raw.outputTokens ??
-      raw.output_tokens ??
-      raw.completionTokens ??
-      raw.completion_tokens,
+  const output = asFiniteNumberWithPreferred(
+    raw.output ?? raw.outputTokens ?? raw.output_tokens,
+    raw.completionTokens ?? raw.completion_tokens,
   );
   const cacheRead = asFiniteNumber(
     raw.cacheRead ??

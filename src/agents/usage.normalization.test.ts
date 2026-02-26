@@ -34,6 +34,24 @@ describe("normalizeUsage", () => {
     });
   });
 
+  it("prefers prompt_tokens over input_tokens when input_tokens is 0 (yunwu-openai bug fix)", () => {
+    // Some providers (e.g., yunwu-openai) return both input_tokens (0) and prompt_tokens (actual count)
+    const usage = normalizeUsage({
+      input_tokens: 0,
+      output_tokens: 0,
+      prompt_tokens: 4,
+      completion_tokens: 222,
+      total_tokens: 226,
+    });
+    expect(usage).toEqual({
+      input: 4,
+      output: 222,
+      cacheRead: undefined,
+      cacheWrite: undefined,
+      total: 226,
+    });
+  });
+
   it("returns undefined for empty usage objects", () => {
     expect(normalizeUsage({})).toBeUndefined();
   });
