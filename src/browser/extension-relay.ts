@@ -84,6 +84,7 @@ type ConnectedTarget = {
 const RELAY_AUTH_HEADER = "x-openclaw-relay-token";
 const DEFAULT_EXTENSION_RECONNECT_GRACE_MS = 5_000;
 const DEFAULT_EXTENSION_COMMAND_RECONNECT_WAIT_MS = 3_000;
+const DEFAULT_EXTENSION_HEARTBEAT_INTERVAL_MS = 30_000;
 
 function headerValue(value: string | string[] | undefined): string | undefined {
   if (!value) {
@@ -681,7 +682,7 @@ export async function ensureChromeExtensionRelayServer(opts: {
           return;
         }
         ws.send(JSON.stringify({ method: "ping" } satisfies ExtensionPingMessage));
-      }, 5000);
+      }, DEFAULT_EXTENSION_HEARTBEAT_INTERVAL_MS);
 
       ws.on("message", (data) => {
         if (extensionWs !== ws) {
