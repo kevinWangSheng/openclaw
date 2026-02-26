@@ -138,12 +138,14 @@ export function parseSystemdShow(output: string): SystemdServiceInfo {
 
 async function execSystemctl(
   args: string[],
+  useUser = true,
 ): Promise<{ stdout: string; stderr: string; code: number }> {
-  return await execFileUtf8("systemctl", args);
+  const finalArgs = useUser ? ["--user", ...args] : args;
+  return await execFileUtf8("systemctl", finalArgs);
 }
 
 export async function isSystemdUserServiceAvailable(): Promise<boolean> {
-  const res = await execSystemctl(["--user", "status"]);
+  const res = await execSystemctl(["--status"], true);
   if (res.code === 0) {
     return true;
   }
@@ -169,16 +171,51 @@ export async function isSystemdUserServiceAvailable(): Promise<boolean> {
   return false;
 }
 
+/**
+ * Check if systemd is available (either user or system scope).
+ * Returns 'user', 'system', or throws an error if neither is available.
+ */
+export async function detectSystemdScope(): Promise<"user" | "system"> {
+  // Try user systemd first
+  const userRes = await execFileUtf8("systemctl", ["--user", "status"]);
+  if (userRes.code === 0) {
+    return "user";
+  }
+  // Try system systemd
+  const systemRes = await execFileUtf8("systemctl", ["status"]);
+  if (systemRes.code === 0) {
+    return "system";
+  }
+  // Check if systemctl command exists at all
+  const detail =
+    `${userRes.stderr} ${userRes.stdout} ${systemRes.stderr} ${systemRes.stdout}`.toLowerCase();
+  if (detail.includes("not found") || detail.includes("no such file")) {
+    throw new Error("systemctl not found; systemd is required on Linux.");
+  }
+  throw new Error("systemd not available (neither user nor system scope accessible).");
+}
+
 async function assertSystemdAvailable() {
-  const res = await execSystemctl(["--user", "status"]);
-  if (res.code === 0) {
+  // Try user systemd first
+  const userRes = await execSystemctl(["status"], true);
+  if (userRes.code === 0) {
     return;
   }
-  const detail = res.stderr || res.stdout;
-  if (detail.toLowerCase().includes("not found")) {
-    throw new Error("systemctl not available; systemd user services are required on Linux.");
+  // Try system systemd (without --user flag)
+  const systemRes = await execSystemctl(["status"], false);
+  if (systemRes.code === 0) {
+    return;
   }
-  throw new Error(`systemctl --user unavailable: ${detail || "unknown error"}`.trim());
+  // Neither worked - check the errors
+  const userDetail = userRes.stderr || userRes.stdout;
+  const systemDetail = systemRes.stderr || systemRes.stdout;
+  const combinedDetail = `${userDetail} ${systemDetail}`.toLowerCase();
+  if (combinedDetail.includes("not found") || combinedDetail.includes("no such file")) {
+    throw new Error("systemctl not found; systemd is required on Linux.");
+  }
+  throw new Error(
+    `systemd unavailable (user: ${userDetail || "unknown"}, system: ${systemDetail || "unknown"}).`,
+  );
 }
 
 export async function installSystemdService({
