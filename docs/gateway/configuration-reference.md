@@ -212,7 +212,7 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
       },
       replyToMode: "off", // off | first | all
       dmPolicy: "pairing",
-      allowFrom: ["1234567890", "steipete"],
+      allowFrom: ["1234567890", "123456789012345678"],
       dm: { enabled: true, groupEnabled: false, groupChannels: ["openclaw-dm"] },
       guilds: {
         "123456789012345678": {
@@ -255,6 +255,8 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
             channelId: "234567890123456789",
           },
         ],
+        daveEncryption: true,
+        decryptionFailureTolerance: 24,
         tts: {
           provider: "openai",
           openai: { voice: "alloy" },
@@ -282,7 +284,10 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
   - `spawnSubagentSessions`: opt-in switch for `sessions_spawn({ thread: true })` auto thread creation/binding
 - `channels.discord.ui.components.accentColor` sets the accent color for Discord components v2 containers.
 - `channels.discord.voice` enables Discord voice channel conversations and optional auto-join + TTS overrides.
+- `channels.discord.voice.daveEncryption` and `channels.discord.voice.decryptionFailureTolerance` pass through to `@discordjs/voice` DAVE options (`true` and `24` by default).
+- OpenClaw additionally attempts voice receive recovery by leaving/rejoining a voice session after repeated decrypt failures.
 - `channels.discord.streaming` is the canonical stream mode key. Legacy `streamMode` and boolean `streaming` values are auto-migrated.
+- `channels.discord.dangerouslyAllowNameMatching` re-enables mutable name/tag matching (break-glass compatibility mode).
 
 **Reaction notification modes:** `off` (none), `own` (bot's messages, default), `all` (all messages), `allowlist` (from `guilds.<id>.users` on all messages).
 
@@ -317,7 +322,8 @@ WhatsApp runs through the gateway's web channel (Baileys Web). It starts automat
 
 - Service account JSON: inline (`serviceAccount`) or file-based (`serviceAccountFile`).
 - Env fallbacks: `GOOGLE_CHAT_SERVICE_ACCOUNT` or `GOOGLE_CHAT_SERVICE_ACCOUNT_FILE`.
-- Use `spaces/<spaceId>` or `users/<userId|email>` for delivery targets.
+- Use `spaces/<spaceId>` or `users/<userId>` for delivery targets.
+- `channels.googlechat.dangerouslyAllowNameMatching` re-enables mutable email principal matching (break-glass compatibility mode).
 
 ### Slack
 
@@ -794,7 +800,7 @@ Periodic heartbeat runs.
         includeReasoning: false,
         session: "main",
         to: "+15555550123",
-        target: "last", // last | whatsapp | telegram | discord | ... | none
+        target: "none", // default: none | options: last | whatsapp | telegram | discord | ...
         prompt: "Read HEARTBEAT.md if it exists...",
         ackMaxChars: 300,
         suppressToolErrorWarnings: false,
@@ -806,6 +812,7 @@ Periodic heartbeat runs.
 
 - `every`: duration string (ms/s/m/h). Default: `30m`.
 - `suppressToolErrorWarnings`: when true, suppresses tool error warning payloads during heartbeat runs.
+- Heartbeats never deliver to direct/DM chat targets when the destination can be classified as direct (for example `user:<id>`, Telegram user chat IDs, or WhatsApp direct numbers/JIDs); those runs still execute, but outbound delivery is skipped.
 - Per-agent: set `agents.list[].heartbeat`. When any agent defines `heartbeat`, **only those agents** run heartbeats.
 - Heartbeats run full agent turns — shorter intervals burn more tokens.
 
@@ -1015,7 +1022,9 @@ Optional **Docker sandboxing** for the embedded agent. See [Sandboxing](/gateway
 
 **`setupCommand`** runs once after container creation (via `sh -lc`). Needs network egress, writable root, root user.
 
-**Containers default to `network: "none"`** — set to `"bridge"` if the agent needs outbound access.
+**Containers default to `network: "none"`** — set to `"bridge"` (or a custom bridge network) if the agent needs outbound access.
+`"host"` is blocked. `"container:<id>"` is blocked by default unless you explicitly set
+`sandbox.docker.dangerouslyAllowContainerNamespaceJoin: true` (break-glass).
 
 **Inbound attachments** are staged into `media/inbound/*` in the active workspace.
 
@@ -1490,7 +1499,7 @@ Controls elevated (host) exec access:
       enabled: true,
       allowFrom: {
         whatsapp: ["+15555550123"],
-        discord: ["steipete", "1234567890123"],
+        discord: ["1234567890123", "987654321098765432"],
       },
     },
   },
@@ -1681,6 +1690,7 @@ Notes:
       subagents: {
         model: "minimax/MiniMax-M2.1",
         maxConcurrent: 1,
+        runTimeoutSeconds: 900,
         archiveAfterMinutes: 60,
       },
     },
@@ -1689,6 +1699,7 @@ Notes:
 ```
 
 - `model`: default model for spawned sub-agents. If omitted, sub-agents inherit the caller's model.
+- `runTimeoutSeconds`: default timeout (seconds) for `sessions_spawn` when the tool call omits `runTimeoutSeconds`. `0` means no timeout.
 - Per-subagent tool policy: `tools.subagents.tools.allow` / `tools.subagents.tools.deny`.
 
 ---
@@ -2016,6 +2027,12 @@ See [Plugins](/tools/plugin).
     enabled: true,
     evaluateEnabled: true,
     defaultProfile: "chrome",
+    ssrfPolicy: {
+      dangerouslyAllowPrivateNetwork: true, // default trusted-network mode
+      // allowPrivateNetwork: true, // legacy alias
+      // hostnameAllowlist: ["*.example.com", "example.com"],
+      // allowedHostnames: ["localhost"],
+    },
     profiles: {
       openclaw: { cdpPort: 18800, color: "#FF4500" },
       work: { cdpPort: 18801, color: "#0066CC" },
@@ -2031,6 +2048,10 @@ See [Plugins](/tools/plugin).
 ```
 
 - `evaluateEnabled: false` disables `act:evaluate` and `wait --fn`.
+- `ssrfPolicy.dangerouslyAllowPrivateNetwork` defaults to `true` when unset (trusted-network model).
+- Set `ssrfPolicy.dangerouslyAllowPrivateNetwork: false` for strict public-only browser navigation.
+- `ssrfPolicy.allowPrivateNetwork` remains supported as a legacy alias.
+- In strict mode, use `ssrfPolicy.hostnameAllowlist` and `ssrfPolicy.allowedHostnames` for explicit exceptions.
 - Remote profiles are attach-only (start/stop/reset disabled).
 - Auto-detect order: default browser if Chromium-based → Chrome → Brave → Edge → Chromium → Chrome Canary.
 - Control service: loopback only (port derived from `gateway.port`, default `18791`).
@@ -2085,6 +2106,8 @@ See [Plugins](/tools/plugin).
       enabled: true,
       basePath: "/openclaw",
       // root: "dist/control-ui",
+      // allowedOrigins: ["https://control.example.com"], // required for non-loopback Control UI
+      // dangerouslyAllowHostHeaderOriginFallback: false, // dangerous Host-header origin fallback mode
       // allowInsecureAuth: false,
       // dangerouslyDisableDeviceAuth: false,
     },
@@ -2119,6 +2142,8 @@ See [Plugins](/tools/plugin).
 - `auth.rateLimit`: optional failed-auth limiter. Applies per client IP and per auth scope (shared-secret and device-token are tracked independently). Blocked attempts return `429` + `Retry-After`.
   - `auth.rateLimit.exemptLoopback` defaults to `true`; set `false` when you intentionally want localhost traffic rate-limited too (for test setups or strict proxy deployments).
 - `tailscale.mode`: `serve` (tailnet only, loopback bind) or `funnel` (public, requires auth).
+- `controlUi.allowedOrigins`: explicit browser-origin allowlist for Control UI/WebChat WebSocket connects. Required when Control UI is reachable on non-loopback binds.
+- `controlUi.dangerouslyAllowHostHeaderOriginFallback`: dangerous mode that enables Host-header origin fallback for deployments that intentionally rely on Host-header origin policy.
 - `remote.transport`: `ssh` (default) or `direct` (ws/wss). For `direct`, `remote.url` must be `ws://` or `wss://`.
 - `gateway.remote.token` is for remote CLI calls only; does not enable local gateway auth.
 - `trustedProxies`: reverse proxy IPs that terminate TLS. Only list proxies you control.
