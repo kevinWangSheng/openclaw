@@ -98,9 +98,15 @@ export function resolvePreferredOpenClawTmpDir(
     if (state === "available") {
       return fallbackPath;
     }
+    // If fallback exists but is invalid (wrong owner/permissions), try to remove and recreate
     if (state === "invalid") {
-      throw new Error(`Unsafe fallback OpenClaw temp dir: ${fallbackPath}`);
+      try {
+        fs.rmSync(fallbackPath, { recursive: true, force: true });
+      } catch {
+        // Failed to remove, will try to create below
+      }
     }
+    // state is "missing" or we just removed invalid dir - try to create it
     try {
       mkdirSync(fallbackPath, { recursive: true, mode: 0o700 });
     } catch {

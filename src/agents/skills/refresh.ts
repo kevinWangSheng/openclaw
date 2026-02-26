@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
+import { glob } from "glob";
 import type { OpenClawConfig } from "../../config/config.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { CONFIG_DIR, resolveUserPath } from "../../utils.js";
@@ -84,6 +85,8 @@ function toWatchGlobRoot(raw: string): string {
 function resolveWatchTargets(workspaceDir: string, config?: OpenClawConfig): string[] {
   // Skills are defined by SKILL.md; watch only those files to avoid traversing
   // or watching unrelated large trees (e.g. datasets) that can exhaust FDs.
+  // Note: chokidar v4+ doesn't support glob patterns, so we expand them to
+  // actual file paths before passing to chokidar.
   const targets = new Set<string>();
   for (const root of resolveWatchPaths(workspaceDir, config)) {
     const globRoot = toWatchGlobRoot(root);
@@ -93,6 +96,28 @@ function resolveWatchTargets(workspaceDir: string, config?: OpenClawConfig): str
     targets.add(`${globRoot}/*/SKILL.md`);
   }
   return Array.from(targets).toSorted();
+}
+
+async function expandGlobPatterns(patterns: string[]): Promise<string[]> {
+  // Expand glob patterns to actual file paths.
+  // Chokidar v4+ doesn't support glob patterns directly.
+  const expandedPaths = new Set<string>();
+  for (const pattern of patterns) {
+    try {
+      const matches = await glob(pattern, { nodir: true, absolute: true });
+      for (const match of matches) {
+        expandedPaths.add(match);
+      }
+    } catch (err) {
+      log.warn(`failed to expand glob pattern ${pattern}: ${String(err)}`);
+    }
+  }
+  // Also add parent directories to watch for new SKILL.md files (add/unlink events)
+  const parentDirs = new Set<string>();
+  for (const filePath of expandedPaths) {
+    parentDirs.add(path.dirname(filePath));
+  }
+  return [...Array.from(expandedPaths), ...Array.from(parentDirs)];
 }
 
 export function registerSkillsChangeListener(listener: (event: SkillsChangeEvent) => void) {
@@ -129,7 +154,10 @@ export function getSkillsSnapshotVersion(workspaceDir?: string): number {
   return Math.max(globalVersion, local);
 }
 
-export function ensureSkillsWatcher(params: { workspaceDir: string; config?: OpenClawConfig }) {
+export async function ensureSkillsWatcher(params: {
+  workspaceDir: string;
+  config?: OpenClawConfig;
+}) {
   const workspaceDir = params.workspaceDir.trim();
   if (!workspaceDir) {
     return;
@@ -153,7 +181,9 @@ export function ensureSkillsWatcher(params: { workspaceDir: string; config?: Ope
     return;
   }
 
-  const watchTargets = resolveWatchTargets(workspaceDir, params.config);
+  // Expand glob patterns to actual file paths (chokidar v4+ doesn't support globs)
+  const globPatterns = resolveWatchTargets(workspaceDir, params.config);
+  const watchTargets = await expandGlobPatterns(globPatterns);
   const pathsKey = watchTargets.join("|");
   if (existing && existing.pathsKey === pathsKey && existing.debounceMs === debounceMs) {
     return;
