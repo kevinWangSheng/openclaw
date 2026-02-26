@@ -417,7 +417,12 @@ export function applyJobPatch(job: CronJob, patch: CronJobPatch) {
       if (explicitStaggerMs !== undefined) {
         job.schedule = { ...patch.schedule, staggerMs: explicitStaggerMs };
       } else if (job.schedule.kind === "cron") {
-        job.schedule = { ...patch.schedule, staggerMs: job.schedule.staggerMs };
+        // Preserve existing expr and tz when not provided in the patch
+        job.schedule = {
+          ...job.schedule,
+          ...patch.schedule,
+          staggerMs: job.schedule.staggerMs,
+        };
       } else {
         const defaultStaggerMs = resolveDefaultCronStaggerMs(patch.schedule.expr);
         job.schedule =
