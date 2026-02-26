@@ -43,6 +43,9 @@ const TELEGRAM_MEDIA_SSRF_POLICY = {
   allowRfc2544BenchmarkRange: true,
 };
 
+/** Timeout for Telegram media downloads (60 seconds) */
+const TELEGRAM_MEDIA_FETCH_TIMEOUT_MS = 60_000;
+
 export async function deliverReplies(params: {
   replies: ReplyPayload[];
   chatId: string;
@@ -328,6 +331,7 @@ export async function resolveMedia(
       filePathHint: filePath,
       maxBytes,
       ssrfPolicy: TELEGRAM_MEDIA_SSRF_POLICY,
+      timeoutMs: TELEGRAM_MEDIA_FETCH_TIMEOUT_MS,
     });
     const originalName = fetched.fileName ?? filePath;
     return saveMediaBuffer(fetched.buffer, fetched.contentType, "inbound", maxBytes, originalName);
