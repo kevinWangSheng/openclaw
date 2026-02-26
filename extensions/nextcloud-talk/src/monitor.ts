@@ -391,5 +391,12 @@ export async function monitorNextcloudTalkProvider(
     `http://${host === "0.0.0.0" ? "localhost" : host}:${port}${path}`;
   logger.info(`[nextcloud-talk:${account.accountId}] webhook listening on ${publicUrl}`);
 
+  // Wait for abort signal before returning (same as Slack channel)
+  await new Promise<void>((resolve) => {
+    opts.abortSignal?.addEventListener("abort", () => resolve(), { once: true });
+  });
+
+  stop();
+
   return { stop };
 }
