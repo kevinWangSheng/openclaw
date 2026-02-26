@@ -33,6 +33,8 @@ type FetchMediaOptions = {
   maxRedirects?: number;
   ssrfPolicy?: SsrFPolicy;
   lookupFn?: LookupFn;
+  /** Timeout in milliseconds for the fetch operation. Default: no timeout */
+  timeoutMs?: number;
 };
 
 function stripQuotes(value: string): string {
@@ -89,6 +91,7 @@ export async function fetchRemoteMedia(options: FetchMediaOptions): Promise<Fetc
     maxRedirects,
     ssrfPolicy,
     lookupFn,
+    timeoutMs,
   } = options;
 
   let res: Response;
@@ -102,6 +105,7 @@ export async function fetchRemoteMedia(options: FetchMediaOptions): Promise<Fetc
       maxRedirects,
       policy: ssrfPolicy,
       lookupFn,
+      timeoutMs,
     });
     res = result.response;
     finalUrl = result.finalUrl;
