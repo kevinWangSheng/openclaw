@@ -12,6 +12,11 @@ function coerceNumberString(value: string, integer: boolean): number | undefined
   if (integer && !Number.isInteger(parsed)) {
     return value;
   }
+  // Preserve large integers (> MAX_SAFE_INTEGER) as strings to avoid precision loss
+  // This is critical for Discord snowflake IDs which exceed JavaScript's safe integer range
+  if (integer && Math.abs(parsed) > Number.MAX_SAFE_INTEGER) {
+    return value;
+  }
   return parsed;
 }
 
