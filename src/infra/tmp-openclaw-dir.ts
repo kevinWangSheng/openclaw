@@ -98,13 +98,24 @@ export function resolvePreferredOpenClawTmpDir(
     if (state === "available") {
       return fallbackPath;
     }
-    if (state === "invalid") {
-      throw new Error(`Unsafe fallback OpenClaw temp dir: ${fallbackPath}`);
+    if (state === "missing") {
+      try {
+        mkdirSync(fallbackPath, { recursive: true, mode: 0o700 });
+      } catch {
+        throw new Error(`Unable to create fallback OpenClaw temp dir: ${fallbackPath}`);
+      }
+      if (resolveDirState(fallbackPath) !== "available") {
+        throw new Error(`Unsafe fallback OpenClaw temp dir: ${fallbackPath}`);
+      }
+      return fallbackPath;
     }
+    // state === "invalid": fallback dir exists but is not secure
+    // Try to remove and recreate it
     try {
+      fs.rmSync(fallbackPath, { recursive: true, force: true });
       mkdirSync(fallbackPath, { recursive: true, mode: 0o700 });
     } catch {
-      throw new Error(`Unable to create fallback OpenClaw temp dir: ${fallbackPath}`);
+      throw new Error(`Unable to recreate fallback OpenClaw temp dir: ${fallbackPath}`);
     }
     if (resolveDirState(fallbackPath) !== "available") {
       throw new Error(`Unsafe fallback OpenClaw temp dir: ${fallbackPath}`);

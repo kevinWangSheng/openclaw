@@ -208,4 +208,30 @@ describe("resolvePreferredOpenClawTmpDir", () => {
     expect(resolved).toBe(fallbackTmp());
     expect(mkdirSync).toHaveBeenCalledWith(fallbackTmp(), { recursive: true, mode: 0o700 });
   });
+
+  it("removes and recreates fallback directory when it exists but is invalid", () => {
+    const lstatSync = vi.fn(() => ({
+      isDirectory: () => true,
+      isSymbolicLink: () => false,
+      uid: 0, // owned by root, not current user
+      mode: 0o40777, // world-writable
+    }));
+    const fallbackLstatSync = vi
+      .fn<NonNullable<TmpDirOptions["lstatSync"]>>()
+      .mockImplementationOnce(() => ({
+        isDirectory: () => true,
+        isSymbolicLink: () => false,
+        uid: 0,
+        mode: 0o40777,
+      }))
+      .mockImplementationOnce(() => secureDirStat(501));
+
+    const { resolved, mkdirSync } = resolveWithMocks({
+      lstatSync,
+      fallbackLstatSync,
+    });
+
+    expect(resolved).toBe(fallbackTmp());
+    expect(mkdirSync).toHaveBeenCalledWith(fallbackTmp(), { recursive: true, mode: 0o700 });
+  });
 });
