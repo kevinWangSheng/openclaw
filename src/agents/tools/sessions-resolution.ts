@@ -286,6 +286,49 @@ export async function resolveSessionReference(params: {
     alias: params.alias,
     mainKey: params.mainKey,
   });
+
+  // Verify the session actually exists before returning success.
+  try {
+    const result = await callGateway<{ key?: string }>({
+      method: "sessions.resolve",
+      params: {
+        key: resolvedKey,
+        spawnedBy: params.restrictToSpawned ? params.requesterInternalKey : undefined,
+        includeGlobal: !params.restrictToSpawned,
+        includeUnknown: !params.restrictToSpawned,
+      },
+    });
+    const foundKey = typeof result?.key === "string" ? result.key.trim() : "";
+    if (!foundKey) {
+      if (params.restrictToSpawned) {
+        return {
+          ok: false,
+          status: "forbidden",
+          error: `Session not visible from this sandboxed agent session: ${raw}`,
+        };
+      }
+      return {
+        ok: false,
+        status: "error",
+        error: `Session not found: ${raw}`,
+      };
+    }
+  } catch (err) {
+    if (params.restrictToSpawned) {
+      return {
+        ok: false,
+        status: "forbidden",
+        error: `Session not visible from this sandboxed agent session: ${raw}`,
+      };
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      status: "error",
+      error: message || `Session not found: ${raw}`,
+    };
+  }
+
   return { ok: true, key: resolvedKey, displayKey, resolvedViaSessionId: false };
 }
 
