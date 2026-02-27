@@ -10,11 +10,20 @@ export function isSilentReplyText(
   if (!text) {
     return false;
   }
+  const trimmed = text.trim();
   const escaped = escapeRegExp(token);
   // Match only the exact silent token with optional surrounding whitespace.
-  // This prevents
-  // substantive replies ending with NO_REPLY from being suppressed (#19537).
-  return new RegExp(`^\\s*${escaped}\\s*$`).test(text);
+  // This prevents substantive replies ending with NO_REPLY from being suppressed (#19537).
+  if (new RegExp(`^\\s*${escaped}\\s*$`).test(text)) {
+    return true;
+  }
+  // Also suppress if the text starts with NO_REPLY (case-insensitive).
+  // This prevents "NO_REPLY\n\nsome text" from leaking trailing content (#28874).
+  // If the text begins with the token (after trimming), suppress regardless of what follows.
+  if (trimmed.toUpperCase().startsWith(token.toUpperCase())) {
+    return true;
+  }
+  return false;
 }
 
 export function isSilentReplyPrefixText(

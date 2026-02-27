@@ -16,13 +16,16 @@ describe("isSilentReplyText", () => {
     expect(isSilentReplyText("")).toBe(false);
   });
 
-  it("returns false for substantive text ending with token (#19537)", () => {
-    const text = "Here is a helpful response.\n\nNO_REPLY";
-    expect(isSilentReplyText(text)).toBe(false);
+  it("returns true for token followed by trailing content (#28874)", () => {
+    // NO_REPLY at the start should suppress the entire message including trailing text
+    expect(isSilentReplyText("NO_REPLY\n\nWhat's my favorite color?")).toBe(true);
+    expect(isSilentReplyText("NO_REPLY\n\nsome text")).toBe(true);
+    expect(isSilentReplyText("  NO_REPLY  \n\nmore content")).toBe(true);
+    expect(isSilentReplyText("NO_REPLY but here is more content")).toBe(true);
   });
 
-  it("returns false for substantive text starting with token", () => {
-    const text = "NO_REPLY but here is more content";
+  it("returns false for substantive text ending with token (#19537)", () => {
+    const text = "Here is a helpful response.\n\nNO_REPLY";
     expect(isSilentReplyText(text)).toBe(false);
   });
 
