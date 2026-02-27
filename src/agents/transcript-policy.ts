@@ -117,7 +117,7 @@ export function resolveTranscriptPolicy(params: {
 
   return {
     sanitizeMode: isOpenAi ? "images-only" : needsNonImageSanitize ? "full" : "images-only",
-    sanitizeToolCallIds: !isOpenAi && sanitizeToolCallIds,
+    sanitizeToolCallIds: isMistral || (!isOpenAi && sanitizeToolCallIds),
     toolCallIdMode,
     repairToolUseResultPairing,
     preserveSignatures: false,
