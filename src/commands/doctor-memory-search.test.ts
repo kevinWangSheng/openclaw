@@ -128,6 +128,20 @@ describe("noteMemorySearchHealth", () => {
     expect(note).not.toHaveBeenCalled();
   });
 
+  it("does not warn when local provider has no modelPath but gateway reports embeddings ready", async () => {
+    resolveMemorySearchConfig.mockReturnValue({
+      provider: "local",
+      local: {}, // no modelPath configured
+      remote: {},
+    });
+
+    await noteMemorySearchHealth(cfg, {
+      gatewayMemoryProbe: { checked: true, ready: true },
+    });
+
+    expect(note).not.toHaveBeenCalled();
+  });
+
   it("notes when gateway probe reports embeddings ready and CLI API key is missing", async () => {
     resolveMemorySearchConfig.mockReturnValue({
       provider: "gemini",
