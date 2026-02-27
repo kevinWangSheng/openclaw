@@ -405,19 +405,23 @@ export function createBrowserTool(opts?: {
             return formatTabsToolResult(tabs);
           }
         case "open": {
-          const targetUrl = readStringParam(params, "targetUrl", {
-            required: true,
-          });
+          // Support both "url" and "targetUrl" parameters for user convenience
+          const url = readStringParam(params, "url");
+          const targetUrl = readStringParam(params, "targetUrl");
+          const resolvedUrl = url ?? targetUrl;
+          if (!resolvedUrl) {
+            throw new Error("url (or targetUrl) required");
+          }
           if (proxyRequest) {
             const result = await proxyRequest({
               method: "POST",
               path: "/tabs/open",
               profile,
-              body: { url: targetUrl },
+              body: { url: resolvedUrl },
             });
             return jsonResult(result);
           }
-          return jsonResult(await browserOpenTab(baseUrl, targetUrl, { profile }));
+          return jsonResult(await browserOpenTab(baseUrl, resolvedUrl, { profile }));
         }
         case "focus": {
           const targetId = readStringParam(params, "targetId", {
@@ -635,9 +639,13 @@ export function createBrowserTool(opts?: {
           });
         }
         case "navigate": {
-          const targetUrl = readStringParam(params, "targetUrl", {
-            required: true,
-          });
+          // Support both "url" and "targetUrl" parameters for user convenience
+          const url = readStringParam(params, "url");
+          const targetUrl = readStringParam(params, "targetUrl");
+          const resolvedUrl = url ?? targetUrl;
+          if (!resolvedUrl) {
+            throw new Error("url (or targetUrl) required");
+          }
           const targetId = readStringParam(params, "targetId");
           if (proxyRequest) {
             const result = await proxyRequest({
@@ -645,7 +653,7 @@ export function createBrowserTool(opts?: {
               path: "/navigate",
               profile,
               body: {
-                url: targetUrl,
+                url: resolvedUrl,
                 targetId,
               },
             });
@@ -653,7 +661,7 @@ export function createBrowserTool(opts?: {
           }
           return jsonResult(
             await browserNavigate(baseUrl, {
-              url: targetUrl,
+              url: resolvedUrl,
               targetId,
               profile,
             }),
