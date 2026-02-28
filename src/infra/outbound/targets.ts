@@ -244,7 +244,10 @@ export function resolveHeartbeatDeliveryTarget(params: {
   const { cfg, entry } = params;
   const heartbeat = params.heartbeat ?? cfg.agents?.defaults?.heartbeat;
   const rawTarget = heartbeat?.target;
-  let target: HeartbeatTarget = "none";
+  // Default to "last" instead of "none" so that system events (e.g., from exec completion
+  // or coding-agent skill notifications) are delivered to the user's channel by default.
+  // Users who want silent heartbeats can explicitly set heartbeat.target to "none".
+  let target: HeartbeatTarget = rawTarget ?? "last";
   if (rawTarget === "none" || rawTarget === "last") {
     target = rawTarget;
   } else if (typeof rawTarget === "string") {
