@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { resolveSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
+import { resolveModelRefFromString } from "../../agents/model-selection.js";
 import {
   abortEmbeddedPiRun,
   isEmbeddedPiRunActive,
@@ -8,6 +9,7 @@ import {
   resolveEmbeddedSessionLane,
 } from "../../agents/pi-embedded.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { resolveAgentModelPrimaryValue } from "../../config/model-input.js";
 import {
   resolveGroupSessionKey,
   resolveSessionFilePath,
@@ -97,6 +99,8 @@ async function sendResetSessionNotice(params: {
   model: string;
   defaultProvider: string;
   defaultModel: string;
+  primaryProvider: string;
+  primaryModel: string;
 }): Promise<void> {
   const route = resolveResetSessionNoticeRoute({
     ctx: params.ctx,
@@ -108,8 +112,8 @@ async function sendResetSessionNotice(params: {
   await routeReply({
     payload: {
       text: buildResetSessionNoticeText({
-        provider: params.provider,
-        model: params.model,
+        provider: params.primaryProvider,
+        model: params.primaryModel,
         defaultProvider: params.defaultProvider,
         defaultModel: params.defaultModel,
       }),
@@ -398,6 +402,21 @@ export async function runPreparedReply(
     }
   }
   if (resetTriggered && command.isAuthorizedSender) {
+    // Get the configured primary model for announcement
+    const primaryModelConfig = cfg.agents?.defaults?.model;
+    const primaryModelValue = resolveAgentModelPrimaryValue(primaryModelConfig);
+    let primaryProvider = defaultProvider;
+    let primaryModel = defaultModel;
+    if (primaryModelValue) {
+      const primaryRef = resolveModelRefFromString({
+        raw: primaryModelValue,
+        defaultProvider,
+      });
+      if (primaryRef) {
+        primaryProvider = primaryRef.ref.provider;
+        primaryModel = primaryRef.ref.model;
+      }
+    }
     await sendResetSessionNotice({
       ctx,
       command,
@@ -409,6 +428,8 @@ export async function runPreparedReply(
       model,
       defaultProvider,
       defaultModel,
+      primaryProvider,
+      primaryModel,
     });
   }
   const sessionIdFinal = sessionId ?? crypto.randomUUID();
