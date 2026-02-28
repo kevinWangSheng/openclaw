@@ -24,6 +24,7 @@ export function setupAccessControlTestHarness(): void {
         whatsapp: {
           dmPolicy: "pairing",
           allowFrom: [],
+          unpairedResponse: "branded",
         },
       },
     };
