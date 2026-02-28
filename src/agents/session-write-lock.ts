@@ -1,7 +1,7 @@
 import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { isPidAlive } from "../shared/pid-alive.js";
+import { isPidAlive, isPidClawdbotProcess } from "../shared/pid-alive.js";
 import { resolveProcessScopedMap } from "../shared/process-scoped-map.js";
 
 type LockFilePayload = {
@@ -293,11 +293,18 @@ function inspectLockPayload(
   const createdAtMs = createdAt ? Date.parse(createdAt) : Number.NaN;
   const ageMs = Number.isFinite(createdAtMs) ? Math.max(0, nowMs - createdAtMs) : null;
 
+  // Check if the pid actually belongs to a clawdbot process (not just any process with that pid)
+  // This helps detect stale locks after a reboot where pids get reused
+  const isClawdbotProcess = pid !== null ? isPidClawdbotProcess(pid) : false;
+
   const staleReasons: string[] = [];
   if (pid === null) {
     staleReasons.push("missing-pid");
   } else if (!pidAlive) {
     staleReasons.push("dead-pid");
+  } else if (!isClawdbotProcess) {
+    // Pid is alive but belongs to a different process (pid reuse after reboot)
+    staleReasons.push("non-clawdbot-pid");
   }
   if (ageMs === null) {
     staleReasons.push("invalid-createdAt");
