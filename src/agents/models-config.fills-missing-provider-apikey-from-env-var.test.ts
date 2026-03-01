@@ -134,7 +134,7 @@ describe("models-config", () => {
     });
   });
 
-  it("preserves non-empty agent apiKey/baseUrl for matching providers in merge mode", async () => {
+  it("preserves agent apiKey but uses config baseUrl when explicitly set in merge mode", async () => {
     await withTempHome(async () => {
       const agentDir = resolveOpenClawAgentDir();
       await fs.mkdir(agentDir, { recursive: true });
@@ -184,8 +184,10 @@ describe("models-config", () => {
       const parsed = await readGeneratedModelsJson<{
         providers: Record<string, { apiKey?: string; baseUrl?: string }>;
       }>();
+      // apiKey should be preserved from models.json since it may contain sensitive tokens
       expect(parsed.providers.custom?.apiKey).toBe("AGENT_KEY");
-      expect(parsed.providers.custom?.baseUrl).toBe("https://agent.example/v1");
+      // baseUrl should come from openclaw.json when explicitly configured there
+      expect(parsed.providers.custom?.baseUrl).toBe("https://config.example/v1");
     });
   });
 
@@ -241,6 +243,65 @@ describe("models-config", () => {
       }>();
       expect(parsed.providers.custom?.apiKey).toBe("CONFIG_KEY");
       expect(parsed.providers.custom?.baseUrl).toBe("https://config.example/v1");
+    });
+  });
+
+  it("preserves agent baseUrl when config does not explicitly set it", async () => {
+    await withTempHome(async () => {
+      const agentDir = resolveOpenClawAgentDir();
+      await fs.mkdir(agentDir, { recursive: true });
+      // Pre-existing models.json with baseUrl set
+      await fs.writeFile(
+        path.join(agentDir, "models.json"),
+        JSON.stringify(
+          {
+            providers: {
+              custom: {
+                baseUrl: "https://cached.example/v1",
+                apiKey: "CACHED_KEY",
+                api: "openai-responses",
+                models: [{ id: "cached-model", name: "Cached model", input: ["text"] }],
+              },
+            },
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      );
+
+      // Config does NOT set baseUrl explicitly - only sets models
+      await ensureOpenClawModelsJson({
+        models: {
+          mode: "merge",
+          providers: {
+            custom: {
+              // No baseUrl set here - should preserve cached value
+              apiKey: "CONFIG_KEY",
+              api: "openai-responses",
+              models: [
+                {
+                  id: "config-model",
+                  name: "Config model",
+                  input: ["text"],
+                  reasoning: false,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                  contextWindow: 8192,
+                  maxTokens: 2048,
+                },
+              ],
+            },
+          },
+        },
+      });
+
+      const parsed = await readGeneratedModelsJson<{
+        providers: Record<string, { apiKey?: string; baseUrl?: string }>;
+      }>();
+      // apiKey should be preserved from models.json
+      expect(parsed.providers.custom?.apiKey).toBe("CACHED_KEY");
+      // baseUrl should be preserved from models.json since config didn't set it
+      expect(parsed.providers.custom?.baseUrl).toBe("https://cached.example/v1");
     });
   });
 

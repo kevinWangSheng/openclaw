@@ -164,11 +164,19 @@ export async function ensureOpenClawModelsJson(
           | undefined;
         if (existing) {
           const preserved: Record<string, unknown> = {};
+          // Always preserve apiKey from models.json - it's user-provided and may contain
+          // sensitive tokens that shouldn't be lost when merging with config.
           if (typeof existing.apiKey === "string" && existing.apiKey) {
             preserved.apiKey = existing.apiKey;
           }
+          // Only preserve baseUrl from models.json if the user hasn't explicitly configured
+          // a new baseUrl in openclaw.json. This ensures baseUrl changes in openclaw.json
+          // are properly synced to models.json instead of being overwritten by cached values.
           if (typeof existing.baseUrl === "string" && existing.baseUrl) {
-            preserved.baseUrl = existing.baseUrl;
+            const explicitBaseUrl = (newEntry as { baseUrl?: string }).baseUrl;
+            if (!explicitBaseUrl) {
+              preserved.baseUrl = existing.baseUrl;
+            }
           }
           mergedProviders[key] = { ...newEntry, ...preserved };
         } else {
