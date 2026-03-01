@@ -316,9 +316,31 @@ function ensureTranscriptFile(params: { transcriptPath: string; sessionId: strin
   }
 }
 
+// Maximum bytes to read from end of transcript for idempotency check (64KB)
+const IDEMPOTENCY_CHECK_MAX_BYTES = 64 * 1024;
+
 function transcriptHasIdempotencyKey(transcriptPath: string, idempotencyKey: string): boolean {
   try {
-    const lines = fs.readFileSync(transcriptPath, "utf-8").split(/\r?\n/);
+    const stat = fs.statSync(transcriptPath);
+    let content: string;
+
+    // For large files, only read the last 64KB to avoid reading entire large transcript
+    if (stat.size > IDEMPOTENCY_CHECK_MAX_BYTES) {
+      const readStart = Math.max(0, stat.size - IDEMPOTENCY_CHECK_MAX_BYTES);
+      const readLength = Math.min(stat.size, IDEMPOTENCY_CHECK_MAX_BYTES);
+      const buf = Buffer.alloc(readLength);
+      const fd = fs.openSync(transcriptPath, "r");
+      try {
+        fs.readSync(fd, buf, 0, readLength, readStart);
+      } finally {
+        fs.closeSync(fd);
+      }
+      content = buf.toString("utf-8");
+    } else {
+      content = fs.readFileSync(transcriptPath, "utf-8");
+    }
+
+    const lines = content.split(/\r?\n/);
     for (const line of lines) {
       if (!line.trim()) {
         continue;
