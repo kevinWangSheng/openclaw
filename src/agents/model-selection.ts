@@ -146,9 +146,24 @@ function shouldUseOpenAICodexProvider(provider: string, model: string): boolean 
   );
 }
 
-export function normalizeModelRef(provider: string, model: string): ModelRef {
+export function normalizeModelRef(
+  provider: string,
+  model: string,
+  options?: { explicitProvider?: boolean },
+): ModelRef {
   const normalizedProvider = normalizeProviderId(provider);
   const normalizedModel = normalizeProviderModelId(normalizedProvider, model.trim());
+  // Detect if user explicitly specified a provider by checking if the model
+  // string contains a slash (indicating it was originally in "provider/model" format)
+  // and the provider matches the current provider after normalization.
+  // This handles cases where the explicitProvider flag wasn't passed through call chains.
+  const hasExplicitProviderInModel = model.trim().includes("/");
+  const isExplicitProvider =
+    options?.explicitProvider || (hasExplicitProviderInModel && normalizedProvider === "openai");
+  // Don't remap to openai-codex if user explicitly specified a different provider
+  if (isExplicitProvider && normalizedProvider === "openai") {
+    return { provider: normalizedProvider, model: normalizedModel };
+  }
   if (shouldUseOpenAICodexProvider(normalizedProvider, normalizedModel)) {
     return { provider: "openai-codex", model: normalizedModel };
   }
@@ -169,7 +184,7 @@ export function parseModelRef(raw: string, defaultProvider: string): ModelRef | 
   if (!providerRaw || !model) {
     return null;
   }
-  return normalizeModelRef(providerRaw, model);
+  return normalizeModelRef(providerRaw, model, { explicitProvider: true });
 }
 
 export function inferUniqueProviderFromConfiguredModels(params: {

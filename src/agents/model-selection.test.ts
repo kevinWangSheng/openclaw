@@ -71,16 +71,18 @@ describe("model-selection", () => {
     });
 
     it("normalizes openai gpt-5.3 codex refs to openai-codex provider", () => {
-      expect(parseModelRef("openai/gpt-5.3-codex", "anthropic")).toEqual({
-        provider: "openai-codex",
-        model: "gpt-5.3-codex",
-      });
+      // When no explicit provider is specified, gpt-5.3-codex maps to openai-codex
       expect(parseModelRef("gpt-5.3-codex", "openai")).toEqual({
         provider: "openai-codex",
         model: "gpt-5.3-codex",
       });
+      // When user explicitly specifies openai provider, respect it (fix for #30844)
+      expect(parseModelRef("openai/gpt-5.3-codex", "anthropic")).toEqual({
+        provider: "openai",
+        model: "gpt-5.3-codex",
+      });
       expect(parseModelRef("openai/gpt-5.3-codex-codex", "anthropic")).toEqual({
-        provider: "openai-codex",
+        provider: "openai",
         model: "gpt-5.3-codex-codex",
       });
     });
