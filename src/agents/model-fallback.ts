@@ -192,6 +192,13 @@ function resolveFallbackCandidates(params: {
   /** Optional explicit fallbacks list; when provided (even empty), replaces agents.defaults.model.fallbacks. */
   fallbacksOverride?: string[];
 }): ModelCandidate[] {
+  // Check if user explicitly specified a provider in the model config (e.g., "openai/gpt-5.3-codex")
+  // This is used to preserve the explicit provider choice and not remap to openai-codex.
+  const rawModelFromConfig = params.cfg
+    ? resolveAgentModelPrimaryValue(params.cfg.agents?.defaults?.model)
+    : undefined;
+  const explicitProviderInConfig = rawModelFromConfig?.includes("/") ?? false;
+
   const primary = params.cfg
     ? resolveConfiguredModelRef({
         cfg: params.cfg,
@@ -203,7 +210,10 @@ function resolveFallbackCandidates(params: {
   const defaultModel = primary?.model ?? DEFAULT_MODEL;
   const providerRaw = String(params.provider ?? "").trim() || defaultProvider;
   const modelRaw = String(params.model ?? "").trim() || defaultModel;
-  const normalizedPrimary = normalizeModelRef(providerRaw, modelRaw);
+  // Pass explicitProvider flag when user explicitly specified a provider in config
+  const normalizedPrimary = normalizeModelRef(providerRaw, modelRaw, {
+    explicitProvider: explicitProviderInConfig,
+  });
   const configuredPrimary = normalizeModelRef(defaultProvider, defaultModel);
   const aliasIndex = buildModelAliasIndex({
     cfg: params.cfg ?? {},
