@@ -412,6 +412,7 @@ describe("runCronIsolatedAgentTurn", () => {
       expectEmbeddedProviderModel({ provider: "openai", model: "gpt-4.1-mini" });
 
       vi.mocked(runEmbeddedPiAgent).mockClear();
+      vi.mocked(loadModelCatalog).mockClear();
       vi.mocked(loadModelCatalog).mockResolvedValue(deterministicCatalog);
       res = (
         await runTurnWithStoredModelOverride(home, {
@@ -424,6 +425,7 @@ describe("runCronIsolatedAgentTurn", () => {
       expectEmbeddedProviderModel({ provider: "openai", model: "gpt-4.1-mini" });
 
       vi.mocked(runEmbeddedPiAgent).mockClear();
+      vi.mocked(loadModelCatalog).mockClear();
       vi.mocked(loadModelCatalog).mockResolvedValue(deterministicCatalog);
       res = (
         await runTurnWithStoredModelOverride(home, {
