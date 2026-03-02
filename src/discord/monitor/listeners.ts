@@ -119,7 +119,9 @@ export function registerDiscordListener(listeners: Array<object>, listener: obje
 }
 
 export class DiscordMessageListener extends MessageCreateListener {
-  private messageQueue: Promise<void> = Promise.resolve();
+  // Shard message queues by channel_id to allow cross-channel parallelism
+  // while preserving within-channel message ordering
+  private messageQueues = new Map<string, Promise<void>>();
 
   constructor(
     private handler: DiscordMessageHandler,
@@ -131,9 +133,17 @@ export class DiscordMessageListener extends MessageCreateListener {
 
   async handle(data: DiscordMessageEvent, client: Client) {
     this.onEvent?.();
+    // Get or create channel-specific queue
+    const channelId = data.channel_id ?? "dm";
+    let channelQueue = this.messageQueues.get(channelId);
+    if (!channelQueue) {
+      channelQueue = Promise.resolve();
+      this.messageQueues.set(channelId, channelQueue);
+    }
     // Release Carbon's dispatch lane immediately, but keep our message handler
-    // serialized to avoid unbounded parallel model/IO work on traffic bursts.
-    this.messageQueue = this.messageQueue
+    // serialized per-channel to avoid unbounded parallel model/IO work on traffic bursts.
+    // Different channels can process in parallel.
+    const newQueue = channelQueue
       .catch(() => {})
       .then(() =>
         runDiscordListenerWithSlowLog({
@@ -146,8 +156,16 @@ export class DiscordMessageListener extends MessageCreateListener {
             logger.error(danger(`discord handler failed: ${String(err)}`));
           },
         }),
-      );
-    void this.messageQueue.catch((err) => {
+      )
+      .finally(() => {
+        // Clean up queue entry when done to prevent memory leak
+        const currentQueue = this.messageQueues.get(channelId);
+        if (currentQueue === newQueue) {
+          this.messageQueues.delete(channelId);
+        }
+      });
+    this.messageQueues.set(channelId, newQueue);
+    void newQueue.catch((err) => {
       const logger = this.logger ?? discordEventQueueLog;
       logger.error(danger(`discord handler failed: ${String(err)}`));
     });
