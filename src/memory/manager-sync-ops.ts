@@ -216,6 +216,9 @@ export abstract class MemoryManagerSyncOps {
       return;
     }
     if (this.vector.dims && this.vector.dims !== dimensions) {
+      log.warn(
+        `memory: dimension mismatch: stored vectors are ${this.vector.dims}-dim but active provider produces ${dimensions}-dim. Re-indexing required.`,
+      );
       this.dropVectorTable();
     }
     this.db.exec(
