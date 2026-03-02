@@ -36,6 +36,6 @@ export function stripInlineStatus(body: string): {
   if (!trimmed) {
     return { cleaned: "", didStrip: false };
   }
-  const cleaned = trimmed.replace(INLINE_STATUS_RE, " ").replace(/\s+/g, " ").trim();
+  const cleaned = trimmed.replace(INLINE_STATUS_RE, " ").replace(/[^\S\n]+/g, " ").trim();
   return { cleaned, didStrip: cleaned !== trimmed };
 }
