@@ -57,7 +57,7 @@ export function parseModelCallbackData(data: string): ParsedModelCallback | null
     }
   }
 
-  // mdl_sel_{provider/model}
+  // mdl_sel_{provider/model} or mdl_sel_{model} (fallback when provider/model exceeds 64 bytes)
   const selMatch = trimmed.match(/^mdl_sel_(.+)$/);
   if (selMatch) {
     const modelRef = selMatch[1];
@@ -70,6 +70,8 @@ export function parseModelCallbackData(data: string): ParsedModelCallback | null
           model: modelRef.slice(slashIndex + 1),
         };
       }
+      // Fallback: model-only callback (no provider - used when provider/model exceeds 64 bytes)
+      return { type: "select", provider: "", model: modelRef };
     }
   }
 
@@ -133,10 +135,15 @@ export function buildModelsKeyboard(params: ModelsKeyboardParams): ButtonRow[] {
     : currentModel;
 
   for (const model of pageModels) {
-    const callbackData = `mdl_sel_${provider}/${model}`;
-    // Skip models that would exceed Telegram's callback_data limit
+    // Try full provider/model format first, fall back to model-only if exceeds 64 bytes
+    let callbackData = `mdl_sel_${provider}/${model}`;
     if (Buffer.byteLength(callbackData, "utf8") > MAX_CALLBACK_DATA_BYTES) {
-      continue;
+      // Fallback: try model-only (without provider prefix)
+      callbackData = `mdl_sel_${model}`;
+      if (Buffer.byteLength(callbackData, "utf8") > MAX_CALLBACK_DATA_BYTES) {
+        // Even model-only exceeds limit, skip this model
+        continue;
+      }
     }
 
     const isCurrentModel = model === currentModelId;

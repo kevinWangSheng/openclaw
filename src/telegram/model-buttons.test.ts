@@ -29,16 +29,27 @@ describe("parseModelCallbackData", () => {
   });
 
   it("returns null for unsupported callback variants", () => {
-    const invalid = [
-      "commands_page_1",
-      "other_callback",
-      "",
-      "mdl_invalid",
-      "mdl_list_",
-      "mdl_sel_noslash",
-    ];
+    const invalid = ["commands_page_1", "other_callback", "", "mdl_invalid", "mdl_list_"];
     for (const input of invalid) {
       expect(parseModelCallbackData(input), input).toBeNull();
+    }
+  });
+
+  it("parses model-only callbacks (fallback when provider/model exceeds 64 bytes)", () => {
+    const cases = [
+      // Model-only callback (no provider prefix)
+      [
+        "mdl_sel_us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        { type: "select", provider: "", model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+      ],
+      [
+        "mdl_sel_global.anthropic.claude-sonnet-4-6",
+        { type: "select", provider: "", model: "global.anthropic.claude-sonnet-4-6" },
+      ],
+      ["mdl_sel_short-model", { type: "select", provider: "", model: "short-model" }],
+    ] as const;
+    for (const [input, expected] of cases) {
+      expect(parseModelCallbackData(input), input).toEqual(expected);
     }
   });
 });
@@ -314,5 +325,57 @@ describe("large model lists (OpenRouter-scale)", () => {
     expect(modelButtons.length).toBe(2);
     expect(modelButtons[0]?.[0]?.text).toBe("short-model");
     expect(modelButtons[1]?.[0]?.text).toBe("another-short");
+  });
+
+  it("falls back to model-only callback when provider/model exceeds 64 bytes", () => {
+    // This is a Bedrock model ID that would exceed the limit with provider prefix
+    // "mdl_sel_amazon-bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0" = 66 bytes
+    const models = [
+      "us.anthropic.claude-haiku-4-5-20251001-v1:0", // Long Bedrock model ID
+      "short-model",
+    ];
+    const result = buildModelsKeyboard({
+      provider: "amazon-bedrock",
+      models,
+      currentPage: 1,
+      totalPages: 1,
+    });
+
+    // Should have 2 model buttons: long one uses fallback, short one uses full format + back
+    const modelButtons = result.filter((row) => !row[0]?.callback_data.startsWith("mdl_back"));
+    expect(modelButtons.length).toBe(2);
+    // The long model should use model-only format (fallback)
+    expect(modelButtons[0]?.[0]?.callback_data).toBe(
+      "mdl_sel_us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    );
+    // The short model should use full format
+    expect(modelButtons[1]?.[0]?.callback_data).toBe("mdl_sel_amazon-bedrock/short-model");
+
+    // Verify both are under 64 bytes
+    expect(
+      Buffer.byteLength(modelButtons[0]?.[0]?.callback_data ?? "", "utf8"),
+    ).toBeLessThanOrEqual(64);
+    expect(
+      Buffer.byteLength(modelButtons[1]?.[0]?.callback_data ?? "", "utf8"),
+    ).toBeLessThanOrEqual(64);
+  });
+
+  it("skips model if even model-only format exceeds 64 bytes", () => {
+    // A model name so long that even without provider it exceeds 64 bytes
+    const models = [
+      "this-model-name-is-absurdly-long-and-will-exceed-the-sixty-four-byte-limit-even-as-single-part",
+      "short-model",
+    ];
+    const result = buildModelsKeyboard({
+      provider: "amazon-bedrock",
+      models,
+      currentPage: 1,
+      totalPages: 1,
+    });
+
+    // Should have only 1 model button (short one) + back
+    const modelButtons = result.filter((row) => !row[0]?.callback_data.startsWith("mdl_back"));
+    expect(modelButtons.length).toBe(1);
+    expect(modelButtons[0]?.[0]?.text).toBe("short-model");
   });
 });

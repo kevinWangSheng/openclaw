@@ -1261,11 +1261,13 @@ export const registerTelegramHandlers = ({
 
         if (modelCallback.type === "select") {
           const { provider, model } = modelCallback;
+          // Handle model-only callback (when provider/model exceeded 64 bytes limit)
+          const modelArg = provider ? `${provider}/${model}` : model;
           // Process model selection as a synthetic message with /model command
           const syntheticMessage = buildSyntheticTextMessage({
             base: callbackMessage,
             from: callback.from,
-            text: `/model ${provider}/${model}`,
+            text: `/model ${modelArg}`,
           });
           await processMessage(buildSyntheticContext(ctx, syntheticMessage), [], storeAllowFrom, {
             forceWasMentioned: true,
