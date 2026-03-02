@@ -34,15 +34,20 @@ export function isSilentReplyPrefixText(
   if (!text) {
     return false;
   }
-  const normalized = text.trimStart().toUpperCase();
+  const normalized = text.trimStart();
   if (!normalized) {
     return false;
   }
-  if (!normalized.includes("_")) {
+  const uppercased = normalized.toUpperCase();
+  // Must consist solely of uppercase letters (or underscore) - no mixed case allowed.
+  // This rejects ambiguous natural-language prefixes like "No" while accepting "N", "NO".
+  if (normalized !== uppercased) {
     return false;
   }
-  if (/[^A-Z_]/.test(normalized)) {
+  // Allow uppercase letter prefixes that are a prefix of the token.
+  // This handles streaming partials like "N" or "NO" before "_" arrives.
+  if (/[^A-Z_]/.test(uppercased)) {
     return false;
   }
-  return token.toUpperCase().startsWith(normalized);
+  return token.toUpperCase().startsWith(uppercased);
 }

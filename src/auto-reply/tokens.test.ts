@@ -81,8 +81,15 @@ describe("isSilentReplyPrefixText", () => {
     expect(isSilentReplyPrefixText("  HEARTBEAT_", "HEARTBEAT_OK")).toBe(true);
   });
 
+  it("matches uppercase letter prefixes before underscore arrives (#32168)", () => {
+    // These prefixes don't contain underscore yet but should be suppressed
+    // to prevent streaming partial leaks like "NO" appearing before "NO_REPLY"
+    expect(isSilentReplyPrefixText("N")).toBe(true);
+    expect(isSilentReplyPrefixText("NO")).toBe(true);
+    expect(isSilentReplyPrefixText("  HEARTBEAT", "HEARTBEAT_OK")).toBe(true);
+  });
+
   it("rejects ambiguous natural-language prefixes", () => {
-    expect(isSilentReplyPrefixText("N")).toBe(false);
     expect(isSilentReplyPrefixText("No")).toBe(false);
     expect(isSilentReplyPrefixText("Hello")).toBe(false);
   });
