@@ -154,6 +154,7 @@ function listChildDirectories(dir: string): string[] {
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
       if (entry.name === "node_modules") continue;
+      if (entry.name === ".git") continue;
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         dirs.push(entry.name);
