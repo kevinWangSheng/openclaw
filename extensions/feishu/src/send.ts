@@ -30,35 +30,102 @@ export type FeishuMessageInfo = {
   createTime?: number;
 };
 
+function extractTextFromElement(element: unknown): string | null {
+  if (!element || typeof element !== "object") {
+    return null;
+  }
+
+  const item = element as {
+    tag?: string;
+    content?: string;
+    text?: { content?: string };
+    elements?: unknown[];
+    columns?: unknown[];
+    title?: { content?: string };
+  };
+
+  // Handle plain text and markdown tags directly
+  if (item.tag === "plain_text" && typeof item.content === "string") {
+    return item.content;
+  }
+  if (item.tag === "lark_md" && typeof item.content === "string") {
+    return item.content;
+  }
+  if (item.tag === "div" && typeof item.text?.content === "string") {
+    return item.text.content;
+  }
+  if (item.tag === "markdown" && typeof item.content === "string") {
+    return item.content;
+  }
+
+  // Handle column_set - recurse into columns -> elements
+  if (item.tag === "column_set" && Array.isArray(item.columns)) {
+    const columnTexts: string[] = [];
+    for (const column of item.columns) {
+      if (!column || typeof column !== "object") continue;
+      const col = column as { elements?: unknown[] };
+      if (Array.isArray(col.elements)) {
+        for (const el of col.elements) {
+          const extracted = extractTextFromElement(el);
+          if (extracted) columnTexts.push(extracted);
+        }
+      }
+    }
+    return columnTexts.length > 0 ? columnTexts.join("\n") : null;
+  }
+
+  // Handle note - recurse into elements
+  if (item.tag === "note") {
+    const note = element as { elements?: unknown[] };
+    if (Array.isArray(note.elements)) {
+      const noteTexts: string[] = [];
+      for (const el of note.elements) {
+        const extracted = extractTextFromElement(el);
+        if (extracted) noteTexts.push(extracted);
+      }
+      return noteTexts.length > 0 ? noteTexts.join("\n") : null;
+    }
+  }
+
+  return null;
+}
+
 function parseInteractiveCardContent(parsed: unknown): string {
   if (!parsed || typeof parsed !== "object") {
     return "[Interactive Card]";
   }
 
-  const candidate = parsed as { elements?: unknown };
-  if (!Array.isArray(candidate.elements)) {
-    return "[Interactive Card]";
-  }
+  const card = parsed as {
+    elements?: unknown[];
+    header?: unknown;
+  };
 
   const texts: string[] = [];
-  for (const element of candidate.elements) {
-    if (!element || typeof element !== "object") {
-      continue;
-    }
-    const item = element as {
-      tag?: string;
-      content?: string;
-      text?: { content?: string };
-    };
-    if (item.tag === "div" && typeof item.text?.content === "string") {
-      texts.push(item.text.content);
-      continue;
-    }
-    if (item.tag === "markdown" && typeof item.content === "string") {
-      texts.push(item.content);
+
+  // Extract from header (sits outside elements array)
+  if (card.header) {
+    const header = card.header as { title?: { content?: string } };
+    if (header.title?.content) {
+      texts.push(header.title.content);
     }
   }
-  return texts.join("\n").trim() || "[Interactive Card]";
+
+  // Extract from elements array
+  if (Array.isArray(card.elements)) {
+    for (const element of card.elements) {
+      const extracted = extractTextFromElement(element);
+      if (extracted) {
+        texts.push(extracted);
+      }
+    }
+  }
+
+  const result = texts.join("\n").trim();
+  if (!result) {
+    // Fall back to full JSON instead of useless placeholder
+    return JSON.stringify(parsed);
+  }
+  return result;
 }
 
 function parseQuotedMessageContent(rawContent: string, msgType: string): string {
