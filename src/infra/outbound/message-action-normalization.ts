@@ -17,6 +17,12 @@ export function normalizeMessageActionInput(params: {
   const normalizedArgs = { ...params.args };
   const { action, toolContext } = params;
 
+  // Map asVoice (message tool schema) to audioAsVoice (channel plugin expects)
+  if (normalizedArgs.asVoice === true && !normalizedArgs.audioAsVoice) {
+    normalizedArgs.audioAsVoice = true;
+    delete normalizedArgs.asVoice;
+  }
+
   const explicitTarget =
     typeof normalizedArgs.target === "string" ? normalizedArgs.target.trim() : "";
   const hasLegacyTarget =
