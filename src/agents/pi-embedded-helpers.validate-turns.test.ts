@@ -484,6 +484,7 @@ describe("validateAnthropicTurns strips dangling tool_use blocks", () => {
     const assistantContent = (result[1] as { content?: unknown[] }).content;
     expect(assistantContent).toEqual([{ type: "toolUse", id: "tool-1", name: "test", input: {} }]);
   });
+<<<<<<< HEAD
 
   it("is replay-safe across repeated validation passes", () => {
     const msgs = asMessages([
@@ -528,4 +529,6 @@ describe("validateAnthropicTurns strips dangling tool_use blocks", () => {
     const result = validateAnthropicTurns(msgs);
     expect(result).toHaveLength(3);
   });
+=======
+>>>>>>> a47c99f0c (fix(anthropic): strip dangling tool_use blocks after compaction)
 });
