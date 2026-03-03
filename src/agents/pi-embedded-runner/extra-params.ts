@@ -730,6 +730,42 @@ function isOpenRouterReasoningUnsupported(modelId: string): boolean {
   return id.startsWith("x-ai/");
 }
 
+/**
+ * Groq only accepts "none" or "default" for reasoning_effort.
+ * Other values (low, medium, high, etc.) cause 400 errors.
+ * Normalize reasoning_effort for Groq provider.
+ * See: openclaw/openclaw#32638
+ */
+function createGroqReasoningWrapper(baseStreamFn: StreamFn | undefined): StreamFn {
+  const underlying = baseStreamFn ?? streamSimple;
+  return (model, context, options) => {
+    const onPayload = options?.onPayload;
+    return underlying(model, context, {
+      ...options,
+      onPayload: (payload) => {
+        if (payload && typeof payload === "object") {
+          const payloadObj = payload as Record<string, unknown>;
+          // Groq only accepts "none" or "default" for reasoning_effort
+          if (payloadObj.reasoning_effort !== undefined) {
+            const effort = payloadObj.reasoning_effort;
+            // Map "off" to "none", everything else to "default"
+            payloadObj.reasoning_effort = effort === "off" ? "none" : "default";
+          }
+          // Also handle nested reasoning format that pi-ai might send
+          if (payloadObj.reasoning && typeof payloadObj.reasoning === "object") {
+            const reasoning = payloadObj.reasoning as Record<string, unknown>;
+            if (reasoning.effort !== undefined) {
+              const effort = reasoning.effort;
+              reasoning.effort = effort === "off" || effort === "none" ? "none" : "default";
+            }
+          }
+        }
+        onPayload?.(payload);
+      },
+    });
+  };
+}
+
 function isGemini31Model(modelId: string): boolean {
   const normalized = modelId.toLowerCase();
   return normalized.includes("gemini-3.1-pro") || normalized.includes("gemini-3.1-flash");
@@ -939,6 +975,14 @@ export function applyExtraParamsToAgent(
     const openRouterThinkingLevel = skipReasoningInjection ? undefined : thinkingLevel;
     agent.streamFn = createOpenRouterWrapper(agent.streamFn, openRouterThinkingLevel);
     agent.streamFn = createOpenRouterSystemCacheWrapper(agent.streamFn);
+  }
+
+  // Groq only accepts "none" or "default" for reasoning_effort.
+  // Normalize any other values to avoid 400 errors.
+  // See: openclaw/openclaw#32638
+  if (provider === "groq") {
+    log.debug(`normalizing reasoning_effort for Groq compatibility ${provider}/${modelId}`);
+    agent.streamFn = createGroqReasoningWrapper(agent.streamFn);
   }
 
   if (provider === "amazon-bedrock" && !isAnthropicBedrockModel(modelId)) {
