@@ -406,18 +406,22 @@ export async function openWritableFileWithinRoot(params: {
     }
   }
 
-  const fileMode = params.mode ?? 0o600;
+  // Use explicit mode if provided (for backward compatibility), otherwise let Node.js
+  // respect umask by not passing mode for newly created files. When opening existing files,
+  // we don't pass a mode anyway since it's ignored by O_WRONLY.
+  const fileMode = params.mode;
 
   let handle: FileHandle;
   let createdForWrite = false;
   try {
     try {
-      handle = await fs.open(ioPath, OPEN_WRITE_EXISTING_FLAGS, fileMode);
+      handle = await fs.open(ioPath, OPEN_WRITE_EXISTING_FLAGS);
     } catch (err) {
       if (!isNotFoundPathError(err)) {
         throw err;
       }
-      handle = await fs.open(ioPath, OPEN_WRITE_CREATE_FLAGS, fileMode);
+      // Create new file: omit mode to respect system umask (Node.js defaults to 0666 & ~umask)
+      handle = await fs.open(ioPath, OPEN_WRITE_CREATE_FLAGS);
       createdForWrite = true;
     }
   } catch (err) {
