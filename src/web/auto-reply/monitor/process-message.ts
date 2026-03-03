@@ -275,7 +275,8 @@ export async function processMessage(params: {
   const isSelfChat =
     params.msg.chatType !== "group" &&
     Boolean(params.msg.selfE164) &&
-    normalizeE164(params.msg.from) === normalizeE164(params.msg.selfE164 ?? "");
+    normalizeE164(params.msg.from) === normalizeE164(params.msg.selfE164 ?? "") &&
+    normalizeE164(params.msg.to) === normalizeE164(params.msg.selfE164 ?? "");
   const responsePrefix =
     prefixOptions.responsePrefix ??
     (configuredResponsePrefix === undefined && isSelfChat
