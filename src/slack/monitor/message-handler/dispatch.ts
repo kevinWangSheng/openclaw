@@ -474,6 +474,9 @@ export async function dispatchPreparedSlackMessage(prepared: PreparedSlackMessag
         limit: ctx.historyLimit,
       });
     }
+    // Clean up typing indicator when no reply is delivered (NO_REPLY case).
+    // This prevents the typing bubble from being stuck on Slack.
+    markDispatchIdle();
     return;
   }
 
