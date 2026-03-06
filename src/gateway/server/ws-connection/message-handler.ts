@@ -821,8 +821,12 @@ export function attachGatewayWsMessageHandler(params: {
               ...clientPairingMetadata,
               silent: allowSilentLocalPairing,
             });
+            // Check if this is a repair request with matching publicKey - auto-approve
+            const paired = await getPairedDevice(device.id);
+            const isRepairWithMatchingKey =
+              pairing.request.isRepair === true && paired?.publicKey === devicePublicKey;
             const context = buildRequestContext();
-            if (pairing.request.silent === true) {
+            if (pairing.request.silent === true || isRepairWithMatchingKey) {
               const approved = await approveDevicePairing(pairing.request.requestId);
               if (approved) {
                 logGateway.info(
@@ -842,7 +846,7 @@ export function attachGatewayWsMessageHandler(params: {
             } else if (pairing.created) {
               context.broadcast("device.pair.requested", pairing.request, { dropIfSlow: true });
             }
-            if (pairing.request.silent !== true) {
+            if (pairing.request.silent !== true && !isRepairWithMatchingKey) {
               setHandshakeState("failed");
               setCloseCause("pairing-required", {
                 deviceId: device.id,
