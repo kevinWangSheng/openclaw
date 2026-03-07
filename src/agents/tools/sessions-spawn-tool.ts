@@ -20,17 +20,35 @@ const UNSUPPORTED_SESSIONS_SPAWN_PARAM_KEYS = [
 ] as const;
 
 const SessionsSpawnToolSchema = Type.Object({
-  task: Type.String(),
-  label: Type.Optional(Type.String()),
-  runtime: optionalStringEnum(SESSIONS_SPAWN_RUNTIMES),
-  agentId: Type.Optional(Type.String()),
-  model: Type.Optional(Type.String()),
-  thinking: Type.Optional(Type.String()),
-  cwd: Type.Optional(Type.String()),
-  runTimeoutSeconds: Type.Optional(Type.Number({ minimum: 0 })),
+  task: Type.String({ description: "Task prompt/instructions for the spawned session." }),
+  label: Type.Optional(
+    Type.String({ description: "Human-readable label for the spawned session." }),
+  ),
+  runtime: optionalStringEnum(SESSIONS_SPAWN_RUNTIMES, {
+    description: 'Session runtime: "subagent" (local) or "acp" (remote agent).',
+  }),
+  agentId: Type.Optional(Type.String({ description: "Target agent ID to run the session as." })),
+  model: Type.Optional(Type.String({ description: "Model ID or alias for the spawned session." })),
+  thinking: Type.Optional(Type.String({ description: "Thinking level for the spawned session." })),
+  cwd: Type.Optional(Type.String({ description: "Working directory for the spawned session." })),
+  runTimeoutSeconds: Type.Optional(
+    Type.Number({
+      minimum: 0,
+      maximum: 3600,
+      description: "Max runtime in seconds before the session is terminated. Max: 1 hour.",
+    }),
+  ),
   // Back-compat: older callers used timeoutSeconds for this tool.
-  timeoutSeconds: Type.Optional(Type.Number({ minimum: 0 })),
-  thread: Type.Optional(Type.Boolean()),
+  timeoutSeconds: Type.Optional(
+    Type.Number({
+      minimum: 0,
+      maximum: 3600,
+      description: "Alias for runTimeoutSeconds (back-compat). Max: 1 hour.",
+    }),
+  ),
+  thread: Type.Optional(
+    Type.Boolean({ description: "Whether to bind the session to the current thread." }),
+  ),
   mode: optionalStringEnum(SUBAGENT_SPAWN_MODES),
   cleanup: optionalStringEnum(["delete", "keep"] as const),
   sandbox: optionalStringEnum(SESSIONS_SPAWN_SANDBOX_MODES),
