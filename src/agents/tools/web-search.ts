@@ -206,6 +206,7 @@ function createWebSearchSchema(provider: (typeof SEARCH_PROVIDERS)[number]) {
         Type.Array(Type.String(), {
           description:
             "Domain filter (max 20). Allowlist: ['nature.com'] or denylist: ['-reddit.com']. Cannot mix.",
+          maxItems: 20,
         }),
       ),
       max_tokens: Type.Optional(
@@ -217,8 +218,9 @@ function createWebSearchSchema(provider: (typeof SEARCH_PROVIDERS)[number]) {
       ),
       max_tokens_per_page: Type.Optional(
         Type.Number({
-          description: "Max tokens extracted per page (default: 2048).",
+          description: "Max tokens extracted per page (default: 2048). Max: 50000.",
           minimum: 1,
+          maximum: 50_000,
         }),
       ),
     });
